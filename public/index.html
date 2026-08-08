@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Directorio de Especialistas</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; }
+      input, button { padding: 0.6rem; margin-right: 0.5rem; }
+      table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+      th, td { border: 1px solid #ccc; padding: 0.6rem; text-align: left; }
+    </style>
+  </head>
+  <body>
+    <h1>Directorio de Médicos Especialistas</h1>
+    <div>
+      <input id="especialidad" placeholder="Especialidad" />
+      <input id="zona" placeholder="Zona" />
+      <button onclick="cargarDirectorio()">Buscar</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Especialidad</th>
+          <th>Zona</th>
+          <th>Teléfono</th>
+          <th>Sitio web</th>
+        </tr>
+      </thead>
+      <tbody id="resultados"></tbody>
+    </table>
+
+    <script>
+      async function cargarDirectorio() {
+        const especialidad = document.getElementById('especialidad').value.trim();
+        const zona = document.getElementById('zona').value.trim();
+        const tbody = document.getElementById('resultados');
+        tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+
+        const params = new URLSearchParams({ page: '1', pageSize: '10' });
+        if (especialidad) params.set('especialidad', especialidad);
+        if (zona) params.set('zona', zona);
+
+        const response = await fetch(`/directorio?${params.toString()}`);
+        const data = await response.json();
+
+        if (!data.items || !data.items.length) {
+          tbody.innerHTML = '<tr><td colspan="5">Sin resultados.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.items.map(item => `
+          <tr>
+            <td>${item.nombre || ''}</td>
+            <td>${item.especialidad || ''}</td>
+            <td>${item.zona || ''}</td>
+            <td>${item.telefono || ''}</td>
+            <td>${item.sitio_web ? `<a href="${item.sitio_web}" target="_blank">Ver</a>` : ''}</td>
+          </tr>
+        `).join('');
+      }
+    </script>
+  </body>
+</html>

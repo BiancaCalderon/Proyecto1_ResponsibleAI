@@ -17,6 +17,28 @@
       ]
     }
   ],
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/directorio",
+        "function": "directorioApi"
+      },
+      {
+        "source": "/recolectar",
+        "function": "recolectarDirectorio"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
   "firestore": {
     "database": "(default)",
     "location": "nam5",
@@ -29,6 +51,9 @@
     },
     "firestore": {
       "port": 8080
+    },
+    "hosting": {
+      "port": 5000
     },
     "ui": {
       "enabled": true
