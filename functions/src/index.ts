@@ -8,9 +8,52 @@ const db = admin.firestore();
 
 setGlobalOptions({maxInstances: 10});
 
+const DEFAULT_PAGE_SIZE = 10;
+const MAX_PAGE_SIZE = 50;
+
+function getClientIp(request: {get(name: string): string | undefined; ip?: string}): string {
+  const forwardedFor = request.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0].trim();
+  }
+
+  const realIp = request.get("x-real-ip");
+  if (realIp) {
+    return realIp;
+  }
+
+  return request.ip || "unknown";
+}
+
+function aplicarIpWhitelist(
+  request: {get(name: string): string | undefined; ip?: string},
+  response: any,
+  next: () => void,
+): void {
+  const allowedIps = (process.env.ALLOWED_IPS || "")
+      .split(",")
+      .map((ip) => ip.trim())
+      .filter(Boolean);
+
+  if (allowedIps.length === 0) {
+    next();
+    return;
+  }
+
+  const clientIp = getClientIp(request);
+  if (!allowedIps.includes(clientIp)) {
+    response.status(403).send({error: "IP no autorizada."});
+    return;
+  }
+
+  next();
+}
+
 export const helloWorld = onRequest((request, response) => {
-  logger.info("Hello logs!", {structuredData: true});
-  response.send("Hello from Firebase!");
+  aplicarIpWhitelist(request, response, () => {
+    logger.info("Hello logs!", {structuredData: true});
+    response.send("Hello from Firebase!");
+  });
 });
 
 interface PlaceResult {
@@ -27,8 +70,8 @@ interface PlacesApiResponse {
   error_message?: string;
 }
 
-export const recolectarDirectorio = onRequest(
-  async (request, response) => {
+export const recolectarDirectorio = onRequest(async (request, response) => {
+  aplicarIpWhitelist(request, response, async () => {
     const keyword = request.query.keyword as string;
     const zona = request.query.zona as string;
     const especialidad = request.query.especialidad as string;
@@ -64,7 +107,7 @@ export const recolectarDirectorio = onRequest(
       }
 
       const resultados = data.results.slice(0, 20);
-      const fecha_recoleccion = new Date().toISOString();
+      const fechaRecoleccion = new Date().toISOString();
 
       const batch = db.batch();
       let guardados = 0;
@@ -79,7 +122,7 @@ export const recolectarDirectorio = onRequest(
           sitio_web: lugar.website || "",
           zona: zona,
           place_id: lugar.place_id,
-          fecha_recoleccion: fecha_recoleccion,
+          fecha_recoleccion: fechaRecoleccion,
           keyword_usado: query,
         });
         guardados++;
@@ -97,5 +140,55 @@ export const recolectarDirectorio = onRequest(
       logger.error("Error inesperado", {error});
       response.status(500).send({error: "Error interno al procesar la solicitud."});
     }
-  }
-);
+  });
+});
+
+export const directorioApi = onRequest(async (request, response) => {
+  aplicarIpWhitelist(request, response, async () => {
+    if (request.method !== "GET") {
+      response.status(405).send({error: "Método no permitido. Solo se admite GET."});
+      return;
+    }
+
+    const pageParam = Number(request.query.page ?? 1);
+    const pageSizeParam = Number(request.query.pageSize ?? DEFAULT_PAGE_SIZE);
+    const especialidad = typeof request.query.especialidad === "string" ? request.query.especialidad.trim() : "";
+    const zona = typeof request.query.zona === "string" ? request.query.zona.trim() : "";
+
+    const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+    let pageSize = Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? pageSizeParam : DEFAULT_PAGE_SIZE;
+    pageSize = Math.min(pageSize, MAX_PAGE_SIZE);
+
+    try {
+      let query = db.collection("directorio").orderBy("fecha_recoleccion", "desc");
+
+      if (especialidad) {
+        query = query.where("especialidad", "==", especialidad);
+      }
+
+      if (zona) {
+        query = query.where("zona", "==", zona);
+      }
+
+      const snapshot = await query.get();
+      const total = snapshot.size;
+      const start = (page - 1) * pageSize;
+      const items = snapshot.docs.slice(start, start + pageSize).map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      response.status(200).send({
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        hasNextPage: start + items.length < total,
+        items,
+      });
+    } catch (error) {
+      logger.error("Error al consultar directorio", {error});
+      response.status(500).send({error: "No se pudo obtener el directorio."});
+    }
+  });
+});
