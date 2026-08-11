@@ -34,6 +34,10 @@
         "function": "recolectarDirectorio"
       },
       {
+        "source": "/sembrar",
+        "function": "sembrarDirectorio"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -40,13 +40,20 @@ function aplicarIpWhitelist(
     return;
   }
 
+  const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
   const clientIp = getClientIp(request);
-  if (!allowedIps.includes(clientIp)) {
-    response.status(403).send({error: "IP no autorizada."});
+  const isLocal = ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost", "unknown"].includes(clientIp);
+
+  if (isEmulator || isLocal || allowedIps.includes(clientIp)) {
+    next();
     return;
   }
 
-  next();
+  response.status(403).send({error: `IP no autorizada (${clientIp}).`});
+}
+
+function normalizeString(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 export const helloWorld = onRequest((request, response) => {
@@ -160,23 +167,52 @@ export const directorioApi = onRequest(async (request, response) => {
     pageSize = Math.min(pageSize, MAX_PAGE_SIZE);
 
     try {
-      let query = db.collection("directorio").orderBy("fecha_recoleccion", "desc");
+      let docs: admin.firestore.QueryDocumentSnapshot[] = [];
+      try {
+        let query: admin.firestore.Query = db.collection("directorio");
+        if (!especialidad && !zona) {
+          query = query.orderBy("fecha_recoleccion", "desc");
+        }
+        const snapshot = await query.get();
+        docs = snapshot.docs;
+      } catch (queryErr) {
+        logger.warn("Consulta Firestore inicial con ordenamiento falló, recuperando sin ordenamiento", {queryErr});
+        const snapshot = await db.collection("directorio").get();
+        docs = snapshot.docs;
+      }
 
+      let itemsData = docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Array<any>;
+
+      // Ordenar por fecha_recoleccion desc (más reciente primero)
+      itemsData.sort((a, b) => {
+        const dateA = a.fecha_recoleccion ? String(a.fecha_recoleccion) : "";
+        const dateB = b.fecha_recoleccion ? String(b.fecha_recoleccion) : "";
+        return dateB.localeCompare(dateA);
+      });
+
+      // Filtrado flexible e insensible a mayúsculas y tildes
       if (especialidad) {
-        query = query.where("especialidad", "==", especialidad);
+        const normEsp = normalizeString(especialidad);
+        itemsData = itemsData.filter((item) => {
+          const itemEsp = normalizeString(item.especialidad || "");
+          return itemEsp.includes(normEsp) || normEsp.includes(itemEsp);
+        });
       }
 
       if (zona) {
-        query = query.where("zona", "==", zona);
+        const normZona = normalizeString(zona);
+        itemsData = itemsData.filter((item) => {
+          const itemZona = normalizeString(item.zona || "");
+          return itemZona.includes(normZona) || normZona.includes(itemZona);
+        });
       }
 
-      const snapshot = await query.get();
-      const total = snapshot.size;
+      const total = itemsData.length;
       const start = (page - 1) * pageSize;
-      const items = snapshot.docs.slice(start, start + pageSize).map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const items = itemsData.slice(start, start + pageSize);
 
       response.status(200).send({
         page,
@@ -190,5 +226,69 @@ export const directorioApi = onRequest(async (request, response) => {
       logger.error("Error al consultar directorio", {error});
       response.status(500).send({error: "No se pudo obtener el directorio."});
     }
+  });
+});
+
+export const sembrarDirectorio = onRequest(async (request, response) => {
+  aplicarIpWhitelist(request, response, async () => {
+    const fecha = new Date().toISOString();
+    const datosSemilla = [
+      {
+        place_id: "place_demo_1",
+        nombre: "Dr. Carlos Mendoza - Cardiólogo",
+        especialidad: "Cardiología",
+        zona: "Zona 10",
+        direccion: "6a Avenida 12-34, Zona 10, Ciudad de Guatemala",
+        telefono: "+502 2345-6789",
+        sitio_web: "https://ejemplo-cardiologia.gt",
+        fecha_recoleccion: fecha,
+        keyword_usado: "cardiólogo zona 10 Guatemala",
+      },
+      {
+        place_id: "place_demo_2",
+        nombre: "Dra. Ana Lucía Gómez - Pediatra",
+        especialidad: "Pediatría",
+        zona: "Zona 1",
+        direccion: "10a Calle 4-56, Zona 1, Ciudad de Guatemala",
+        telefono: "+502 2234-5678",
+        sitio_web: "https://ejemplo-pediatria.gt",
+        fecha_recoleccion: fecha,
+        keyword_usado: "clínica pediátrica zona 1 Guatemala",
+      },
+      {
+        place_id: "place_demo_3",
+        nombre: "Dr. Juan Francisco Reyes - Dermatólogo",
+        especialidad: "Dermatología",
+        zona: "Zona 15",
+        direccion: "Bulevar Vista Hermosa 15-20, Zona 15, Ciudad de Guatemala",
+        telefono: "+502 2456-7890",
+        sitio_web: "https://ejemplo-dermatologia.gt",
+        fecha_recoleccion: fecha,
+        keyword_usado: "dermatólogo zona 15 Guatemala",
+      },
+      {
+        place_id: "place_demo_4",
+        nombre: "Dra. María José Morales - Ginecóloga",
+        especialidad: "Ginecología",
+        zona: "Zona 9",
+        direccion: "7a Avenida 8-90, Zona 9, Ciudad de Guatemala",
+        telefono: "+502 2333-4444",
+        sitio_web: "https://ejemplo-ginecologia.gt",
+        fecha_recoleccion: fecha,
+        keyword_usado: "ginecólogo zona 9 Guatemala",
+      },
+    ];
+
+    const batch = db.batch();
+    for (const doc of datosSemilla) {
+      const ref = db.collection("directorio").doc(doc.place_id);
+      batch.set(ref, doc);
+    }
+    await batch.commit();
+
+    response.status(200).send({
+      mensaje: "Datos de prueba (semilla) insertados exitosamente.",
+      total_insertados: datosSemilla.length,
+    });
   });
 });
