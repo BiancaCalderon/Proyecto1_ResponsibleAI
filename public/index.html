@@ -3,59 +3,277 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Directorio de Especialistas</title>
+    <title>Directorio de Médicos Especialistas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-      body { font-family: Arial, sans-serif; margin: 2rem; line-height: 1.5; }
-      input, button { padding: 0.6rem; margin-right: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
-      button { background-color: #0066cc; color: white; border: none; cursor: pointer; }
-      button:hover { background-color: #004c99; }
-      button:disabled { background-color: #999; cursor: not-allowed; }
-      table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
-      th, td { border: 1px solid #ccc; padding: 0.6rem; text-align: left; }
-      th { background-color: #f4f4f4; }
-      .error-msg { color: #d9534f; font-weight: bold; }
-      .success-msg { color: #2e7d32; font-weight: bold; }
-      section { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid #eee; }
-      h2 { font-size: 1.1rem; color: #333; }
-      #estado-recoleccion { margin-top: 0.8rem; }
+      :root {
+        --ink: #1A2420;
+        --ink-soft: #4A5751;
+        --bg: #F7F6F2;
+        --card: #FFFFFF;
+        --primary: #0E6E64;
+        --primary-dark: #0A4F48;
+        --primary-tint: #E6F0EE;
+        --accent: #D98A3D;
+        --border: #E1DED4;
+        --border-strong: #C9C4B4;
+        --danger: #B3402F;
+        --ok-dot: #0E6E64;
+        --gap-dot: #C9C4B4;
+        --radius: 10px;
+        --font-display: 'Fraunces', serif;
+        --font-body: 'Inter', sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        font-family: var(--font-body);
+        background: var(--bg);
+        color: var(--ink);
+        margin: 0;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+
+      header.top { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 0.4rem; }
+
+      .mark {
+        width: 40px; height: 40px; border-radius: 9px;
+        background: var(--primary);
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+      }
+      .mark svg { width: 20px; height: 20px; }
+
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.9rem;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+
+      .subtitle {
+        color: var(--ink-soft);
+        font-size: 0.95rem;
+        margin: 0.3rem 0 2.2rem 52px;
+        max-width: 46ch;
+      }
+
+      section.panel {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.5rem 1.6rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1.1rem; }
+
+      h2 {
+        font-family: var(--font-body);
+        font-weight: 600;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--primary-dark);
+        margin: 0;
+      }
+
+      .panel-hint { font-size: 0.82rem; color: var(--ink-soft); margin: 0; }
+
+      .field-row { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: stretch; }
+
+      .field { display: flex; flex-direction: column; gap: 0.3rem; flex: 1 1 180px; min-width: 150px; }
+
+      .field label {
+        font-size: 0.72rem; font-weight: 500; color: var(--ink-soft);
+        text-transform: uppercase; letter-spacing: 0.04em;
+      }
+
+      input {
+        font-family: var(--font-body);
+        font-size: 0.92rem;
+        padding: 0.62rem 0.75rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 7px;
+        background: var(--bg);
+        color: var(--ink);
+        width: 100%;
+      }
+      input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-tint);
+      }
+      input::placeholder { color: #9A9587; }
+
+      button {
+        font-family: var(--font-body);
+        font-weight: 600;
+        font-size: 0.88rem;
+        padding: 0.62rem 1.3rem;
+        border-radius: 7px;
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s ease;
+      }
+
+      .btn-primary { background: var(--primary); color: #fff; }
+      .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+      .btn-primary:disabled { background: var(--border-strong); cursor: not-allowed; }
+
+      .btn-secondary { background: var(--ink); color: #fff; }
+      .btn-secondary:hover { background: #050807; }
+
+      .btn-align { display: flex; align-items: flex-end; }
+
+      #estado-recoleccion { margin-top: 0.9rem; font-size: 0.86rem; }
+      .msg-ok { color: var(--primary-dark); }
+      .msg-ok::before { content: '●'; color: var(--ok-dot); margin-right: 0.4em; font-size: 0.7em; }
+      .msg-err { color: var(--danger); }
+
+      table { border-collapse: collapse; width: 100%; margin-top: 0.3rem; font-size: 0.88rem; }
+      thead th {
+        text-align: left;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--ink-soft);
+        font-weight: 600;
+        padding: 0 0.7rem 0.6rem;
+        border-bottom: 1px solid var(--border-strong);
+      }
+      tbody td {
+        padding: 0.7rem;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      tbody tr:last-child td { border-bottom: none; }
+      tbody tr:hover { background: var(--primary-tint); }
+
+      .nombre-cell { font-weight: 500; }
+      .esp-pill {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 500;
+        padding: 0.15rem 0.55rem;
+        border-radius: 999px;
+        background: var(--primary-tint);
+        color: var(--primary-dark);
+      }
+
+      .datum { display: flex; align-items: center; gap: 0.45rem; }
+      .datum .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+      .datum.has .dot { background: var(--ok-dot); }
+      .datum.missing .dot { background: var(--gap-dot); }
+      .datum.missing span.txt { color: #9A9587; }
+
+      a.site-link { color: var(--primary-dark); text-decoration: none; font-weight: 500; }
+      a.site-link:hover { text-decoration: underline; }
+
+      .empty-state, .loading-state { text-align: center; color: var(--ink-soft); padding: 1.6rem 0; font-size: 0.9rem; }
+
+      @media (max-width: 560px) {
+        .subtitle { margin-left: 0; }
+        .field-row { flex-direction: column; }
+        table, thead, tbody, tr { display: block; }
+        thead { display: none; }
+        tbody tr { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.7rem; padding: 0.6rem 0.8rem; }
+        tbody td { border: none; padding: 0.3rem 0; }
+        tbody td::before { content: attr(data-label); display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 0.1rem; }
+      }
     </style>
   </head>
   <body>
-    <h1>Directorio de Médicos Especialistas</h1>
+    <div class="wrap">
+      <header class="top">
+        <div class="mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="10" y="4" width="4" height="16" rx="1.5" fill="#fff"/>
+            <rect x="4" y="10" width="16" height="4" rx="1.5" fill="#fff"/>
+          </svg>
+        </div>
+        <h1>Directorio de médicos especialistas</h1>
+      </header>
+      <p class="subtitle">Ciudad de Guatemala · datos recolectados de Google Places, con fecha de recolección por registro.</p>
 
-    <section>
-      <h2>Recolectar nuevos datos</h2>
-      <div>
-        <input id="rec-keyword" placeholder="Keyword (ej. cardiologo)" />
-        <input id="rec-zona" placeholder="Zona (ej. zona10)" />
-        <input id="rec-especialidad" placeholder="Especialidad (ej. Cardiología)" />
-        <button id="btn-recolectar" onclick="recolectarDatos()">Buscar y guardar</button>
-      </div>
-      <div id="estado-recoleccion"></div>
-    </section>
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Recolectar nuevos datos</h2>
+          <p class="panel-hint">Consulta Google Places y guarda los resultados</p>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="rec-keyword">Palabra clave</label>
+            <input id="rec-keyword" placeholder="cardiólogo" />
+          </div>
+          <div class="field">
+            <label for="rec-zona">Zona</label>
+            <input id="rec-zona" placeholder="zona 10" />
+          </div>
+          <div class="field">
+            <label for="rec-especialidad">Especialidad</label>
+            <input id="rec-especialidad" placeholder="Cardiología" />
+          </div>
+          <div class="btn-align">
+            <button id="btn-recolectar" class="btn-secondary" onclick="recolectarDatos()">Buscar y guardar</button>
+          </div>
+        </div>
+        <div id="estado-recoleccion"></div>
+      </section>
 
-    <section>
-      <h2>Consultar directorio</h2>
-      <div>
-        <input id="especialidad" placeholder="Especialidad (ej. Cardiología)" onkeydown="if(event.key==='Enter') cargarDirectorio()" />
-        <input id="zona" placeholder="Zona (ej. Zona 10)" onkeydown="if(event.key==='Enter') cargarDirectorio()" />
-        <button onclick="cargarDirectorio()">Buscar</button>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Especialidad</th>
-            <th>Zona</th>
-            <th>Teléfono</th>
-            <th>Sitio web</th>
-          </tr>
-        </thead>
-        <tbody id="resultados"></tbody>
-      </table>
-    </section>
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Consultar directorio</h2>
+          <p class="panel-hint">Filtra los datos ya recolectados</p>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="especialidad">Especialidad</label>
+            <input id="especialidad" placeholder="Cardiología" onkeydown="if(event.key==='Enter') cargarDirectorio()" />
+          </div>
+          <div class="field">
+            <label for="zona">Zona</label>
+            <input id="zona" placeholder="Zona 10" onkeydown="if(event.key==='Enter') cargarDirectorio()" />
+          </div>
+          <div class="btn-align">
+            <button class="btn-primary" onclick="cargarDirectorio()">Buscar</button>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Especialidad</th>
+              <th>Zona</th>
+              <th>Dirección</th>
+              <th>Teléfono</th>
+              <th>Sitio web</th>
+            </tr>
+          </thead>
+          <tbody id="resultados"></tbody>
+        </table>
+      </section>
+    </div>
 
     <script>
+      function celdaDato(valor, esUrl) {
+        const tiene = !!valor;
+        const texto = tiene ? valor : 'Sin dato';
+        if (tiene && esUrl) {
+          return `<span class="datum has"><span class="dot"></span><a class="site-link" href="${valor}" target="_blank" rel="noopener">Ver sitio</a></span>`;
+        }
+        return `<span class="datum ${tiene ? 'has' : 'missing'}"><span class="dot"></span><span class="txt">${texto}</span></span>`;
+      }
+
       async function recolectarDatos() {
         const keyword = document.getElementById('rec-keyword').value.trim();
         const zona = document.getElementById('rec-zona').value.trim();
@@ -64,12 +282,12 @@
         const boton = document.getElementById('btn-recolectar');
 
         if (!keyword || !zona || !especialidad) {
-          estadoDiv.innerHTML = '<p class="error-msg">Completa keyword, zona y especialidad antes de buscar.</p>';
+          estadoDiv.innerHTML = '<p class="msg-err">Completa palabra clave, zona y especialidad antes de buscar.</p>';
           return;
         }
 
         boton.disabled = true;
-        estadoDiv.innerHTML = '<p>Consultando Google Places y guardando resultados...</p>';
+        estadoDiv.innerHTML = '<p>Consultando Google Places y guardando resultados…</p>';
 
         const params = new URLSearchParams({ keyword, zona, especialidad });
 
@@ -79,18 +297,17 @@
 
           if (!response.ok) {
             const errorText = data.error || data.detalle || `Error HTTP ${response.status}`;
-            estadoDiv.innerHTML = `<p class="error-msg">Error: ${errorText}</p>`;
+            estadoDiv.innerHTML = `<p class="msg-err">${errorText}</p>`;
             return;
           }
 
-          estadoDiv.innerHTML = `<p class="success-msg">${data.resultados_guardados} resultados guardados para "${data.query_usada}".</p>`;
+          estadoDiv.innerHTML = `<p class="msg-ok">${data.resultados_guardados} resultados guardados para "${data.query_usada}".</p>`;
 
-          // Refresca automáticamente la tabla de consulta con la especialidad recién recolectada
           document.getElementById('especialidad').value = especialidad;
           document.getElementById('zona').value = zona;
           cargarDirectorio();
         } catch (err) {
-          estadoDiv.innerHTML = `<p class="error-msg">Error de conexión al recolectar datos. (${err.message})</p>`;
+          estadoDiv.innerHTML = `<p class="msg-err">Error de conexión al recolectar datos. (${err.message})</p>`;
         } finally {
           boton.disabled = false;
         }
@@ -100,7 +317,7 @@
         const especialidad = document.getElementById('especialidad').value.trim();
         const zona = document.getElementById('zona').value.trim();
         const tbody = document.getElementById('resultados');
-        tbody.innerHTML = '<tr><td colspan="5">Cargando datos del directorio...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6"><p class="loading-state">Cargando datos del directorio…</p></td></tr>';
 
         const params = new URLSearchParams({ page: '1', pageSize: '20' });
         if (especialidad) params.set('especialidad', especialidad);
@@ -108,36 +325,31 @@
 
         try {
           const response = await fetch(`/directorio?${params.toString()}`);
-          const text = await response.text();
-          let data;
-          try {
-            data = JSON.parse(text);
-          } catch {
-            data = { error: text || `Error HTTP ${response.status}` };
-          }
+          const data = await response.json();
 
           if (!response.ok) {
-            const errorText = data.error || data.detalle || text || `Error HTTP ${response.status}`;
-            tbody.innerHTML = `<tr><td colspan="5" class="error-msg">Error: ${errorText}</td></tr>`;
+            const errorText = data.error || data.detalle || `Error HTTP ${response.status}`;
+            tbody.innerHTML = `<tr><td colspan="6"><p class="msg-err">${errorText}</p></td></tr>`;
             return;
           }
 
           if (!data.items || !data.items.length) {
-            tbody.innerHTML = '<tr><td colspan="5">Sin resultados.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6"><p class="empty-state">Sin resultados. Usa "Buscar y guardar" para recolectar esta combinación.</p></td></tr>';
             return;
           }
 
           tbody.innerHTML = data.items.map(item => `
             <tr>
-              <td>${item.nombre || '-'}</td>
-              <td>${item.especialidad || '-'}</td>
-              <td>${item.zona || '-'}</td>
-              <td>${item.telefono || '-'}</td>
-              <td>${item.sitio_web ? `<a href="${item.sitio_web}" target="_blank" rel="noopener">Ver sitio</a>` : '-'}</td>
+              <td data-label="Nombre" class="nombre-cell">${item.nombre || '-'}</td>
+              <td data-label="Especialidad"><span class="esp-pill">${item.especialidad || '-'}</span></td>
+              <td data-label="Zona">${item.zona || '-'}</td>
+              <td data-label="Dirección">${item.direccion || '-'}</td>
+              <td data-label="Teléfono">${celdaDato(item.telefono, false)}</td>
+              <td data-label="Sitio web">${celdaDato(item.sitio_web, true)}</td>
             </tr>
           `).join('');
         } catch (err) {
-          tbody.innerHTML = `<tr><td colspan="5" class="error-msg">Error de conexión al obtener el directorio. (${err.message})</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6"><p class="msg-err">Error de conexión al obtener el directorio. (${err.message})</p></td></tr>`;
         }
       }
 

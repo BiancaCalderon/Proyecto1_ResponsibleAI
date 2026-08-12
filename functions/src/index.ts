@@ -77,6 +77,14 @@ interface PlacesApiResponse {
   error_message?: string;
 }
 
+interface PlaceDetailsResponse {
+  result?: {
+    formatted_phone_number?: string;
+    website?: string;
+  };
+  status: string;
+}
+
 export const recolectarDirectorio = onRequest(async (request, response) => {
   aplicarIpWhitelist(request, response, async () => {
     const keyword = request.query.keyword as string;
@@ -120,13 +128,32 @@ export const recolectarDirectorio = onRequest(async (request, response) => {
       let guardados = 0;
 
       for (const lugar of resultados) {
+        let telefono = lugar.formatted_phone_number || "";
+        let sitioWeb = lugar.website || "";
+
+        // Si textsearch no trajo teléfono o sitio web, intentamos con Place Details
+        if (!telefono || !sitioWeb) {
+          try {
+            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${lugar.place_id}&fields=formatted_phone_number,website&key=${apiKey}`;
+            const detailsResponse = await fetch(detailsUrl);
+            const detailsData = (await detailsResponse.json()) as PlaceDetailsResponse;
+
+            if (detailsData.status === "OK" && detailsData.result) {
+              telefono = telefono || detailsData.result.formatted_phone_number || "";
+              sitioWeb = sitioWeb || detailsData.result.website || "";
+            }
+          } catch (detailsError) {
+            logger.warn(`No se pudo obtener detalles para ${lugar.place_id}`, {detailsError});
+          }
+        }
+
         const docRef = db.collection("directorio").doc(lugar.place_id);
         batch.set(docRef, {
           nombre: lugar.name,
           especialidad: especialidad,
           direccion: lugar.formatted_address || "",
-          telefono: lugar.formatted_phone_number || "",
-          sitio_web: lugar.website || "",
+          telefono: telefono,
+          sitio_web: sitioWeb,
           zona: zona,
           place_id: lugar.place_id,
           fecha_recoleccion: fechaRecoleccion,
