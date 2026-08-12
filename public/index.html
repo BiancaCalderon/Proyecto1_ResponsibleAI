@@ -407,10 +407,26 @@
         font-weight: 500;
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 0.5rem;
+        flex-wrap: wrap;
       }
       .msg-ok { background: var(--status-ok-bg); color: var(--status-ok-text); }
       .msg-err { background: var(--status-err-bg); color: var(--status-err-text); }
+
+      .btn-ver-directorio {
+        background: var(--brand-blue);
+        color: #FFFFFF;
+        border: none;
+        font-family: var(--font-sans);
+        font-size: 0.775rem;
+        font-weight: 600;
+        padding: 0.35rem 0.75rem;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: opacity 0.15s ease;
+      }
+      .btn-ver-directorio:hover { opacity: 0.9; }
 
       /* Data Section & Table */
       .data-card {
@@ -643,17 +659,34 @@
       <!-- Panel Unificado de Control -->
       <section class="command-bar">
         <div class="tabs-header">
-          <button class="tab-btn active" id="tab-consultar" onclick="switchTab('consultar')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            Consultar Directorio
-          </button>
           <button class="tab-btn" id="tab-recolectar" onclick="switchTab('recolectar')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             Recolectar Nuevos Datos
           </button>
+          <button class="tab-btn active" id="tab-consultar" onclick="switchTab('consultar')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            Consultar Directorio
+          </button>
         </div>
 
         <div class="tab-content">
+          <!-- Formulario Recolectar -->
+          <div id="form-recolectar" class="action-form">
+            <div class="field">
+              <label for="rec-keyword">Palabra Clave</label>
+              <input id="rec-keyword" placeholder="Ej. cardiólogo" />
+            </div>
+            <div class="field">
+              <label for="rec-zona">Zona</label>
+              <input id="rec-zona" placeholder="Ej. zona 10" />
+            </div>
+            <div class="field">
+              <label for="rec-especialidad">Especialidad</label>
+              <input id="rec-especialidad" placeholder="Ej. Cardiología" />
+            </div>
+            <button id="btn-recolectar" class="btn-act" onclick="recolectarDatos()">Buscar y Guardar</button>
+          </div>
+
           <!-- Formulario Consultar -->
           <div id="form-consultar" class="action-form active">
             <div class="field">
@@ -673,23 +706,6 @@
               </select>
             </div>
             <button class="btn-act" onclick="cargarDirectorio(1)">Buscar Registros</button>
-          </div>
-
-          <!-- Formulario Recolectar -->
-          <div id="form-recolectar" class="action-form">
-            <div class="field">
-              <label for="rec-keyword">Palabra Clave</label>
-              <input id="rec-keyword" placeholder="Ej. cardiólogo" />
-            </div>
-            <div class="field">
-              <label for="rec-zona">Zona</label>
-              <input id="rec-zona" placeholder="Ej. zona 10" />
-            </div>
-            <div class="field">
-              <label for="rec-especialidad">Especialidad</label>
-              <input id="rec-especialidad" placeholder="Ej. Cardiología" />
-            </div>
-            <button id="btn-recolectar" class="btn-act" onclick="recolectarDatos()">Ejecutar Sync</button>
           </div>
 
           <div id="estado-recoleccion"></div>
@@ -724,7 +740,8 @@
     <script>
       let paginaActual = 1;
       let esCargaInicial = true;
-      const tInicioCarga = Date.now(); // Marca de tiempo inicial para controlar visibilidad mínima
+      let timerAutoTransicion = null;
+      const tInicioCarga = Date.now();
 
       // Dark Mode Logic
       function initTheme() {
@@ -753,6 +770,7 @@
 
       // Tabs Logic
       function switchTab(tab) {
+        if (timerAutoTransicion) clearTimeout(timerAutoTransicion);
         const isConsultar = tab === 'consultar';
         document.getElementById('tab-consultar').classList.toggle('active', isConsultar);
         document.getElementById('tab-recolectar').classList.toggle('active', !isConsultar);
@@ -761,6 +779,14 @@
         document.getElementById('form-recolectar').classList.toggle('active', !isConsultar);
         
         document.getElementById('estado-recoleccion').innerHTML = '';
+      }
+
+      function irADirectorioConFiltros(esp, zn) {
+        if (timerAutoTransicion) clearTimeout(timerAutoTransicion);
+        document.getElementById('especialidad').value = esp;
+        document.getElementById('zona').value = zn;
+        switchTab('consultar');
+        cargarDirectorio(1);
       }
 
       function celdaDato(valor, esUrl) {
@@ -778,6 +804,8 @@
       }
 
       async function recolectarDatos() {
+        if (timerAutoTransicion) clearTimeout(timerAutoTransicion);
+
         const keyword = document.getElementById('rec-keyword').value.trim();
         const zona = document.getElementById('rec-zona').value.trim();
         const especialidad = document.getElementById('rec-especialidad').value.trim();
@@ -785,12 +813,12 @@
         const boton = document.getElementById('btn-recolectar');
 
         if (!keyword || !zona || !especialidad) {
-          estadoDiv.innerHTML = '<p class="msg-err">Llena palabra clave, zona y especialidad antes de ejecutar.</p>';
+          estadoDiv.innerHTML = '<p class="msg-err"><span>Completa palabra clave, zona y especialidad antes de buscar.</span></p>';
           return;
         }
 
         boton.disabled = true;
-        estadoDiv.innerHTML = '<p class="msg-ok" style="background:var(--bg-subtle); color:var(--text-secondary);"><span class="inline-spinner"></span>Sincronizando con Google Places...</p>';
+        estadoDiv.innerHTML = '<p class="msg-ok" style="background:var(--bg-subtle); color:var(--text-secondary);"><span><span class="inline-spinner"></span>Consultando Google Places...</span></p>';
 
         const params = new URLSearchParams({ keyword, zona, especialidad });
 
@@ -800,18 +828,29 @@
 
           if (!response.ok) {
             const errorText = data.error || data.detalle || `Error HTTP ${response.status}`;
-            estadoDiv.innerHTML = `<p class="msg-err">${errorText}</p>`;
+            estadoDiv.innerHTML = `<p class="msg-err"><span>${errorText}</span></p>`;
             return;
           }
 
-          estadoDiv.innerHTML = `<p class="msg-ok">${data.resultados_guardados} resultados procesados para "${data.query_usada}".</p>`;
+          const nuevos = data.resultados_guardados ?? 0;
+          const yaExistian = data.resultados_ya_existentes ?? 0;
+          const detalleExistentes = yaExistian > 0 ? ` (${yaExistian} ya existían)` : '';
 
-          document.getElementById('especialidad').value = especialidad;
-          document.getElementById('zona').value = zona;
-          switchTab('consultar');
-          cargarDirectorio(1);
+          // Banner de éxito con botón explícito y auto-cambio suave tras 4s
+          estadoDiv.innerHTML = `
+            <p class="msg-ok">
+              <span><strong>${nuevos} resultados nuevos guardados</strong> para "${data.query_usada}"${detalleExistentes}.</span>
+              <button class="btn-ver-directorio" onclick="irADirectorioConFiltros('${especialidad}', '${zona}')">Ver en el directorio ↗</button>
+            </p>
+          `;
+
+          // Transición automática solo tras 4 segundos para asegurar lectura suficiente
+          timerAutoTransicion = setTimeout(() => {
+            irADirectorioConFiltros(especialidad, zona);
+          }, 4000);
+
         } catch (err) {
-          estadoDiv.innerHTML = `<p class="msg-err">Error de conexión: ${err.message}</p>`;
+          estadoDiv.innerHTML = `<p class="msg-err"><span>Error de conexión: ${err.message}</span></p>`;
         } finally {
           boton.disabled = false;
         }
@@ -838,7 +877,7 @@
 
           if (!response.ok) {
             const errorText = data.error || data.detalle || `Error HTTP ${response.status}`;
-            tbody.innerHTML = `<tr><td colspan="5"><p class="msg-err" style="margin: 1rem;">${errorText}</p></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5"><p class="msg-err" style="margin: 1rem;"><span>${errorText}</span></p></td></tr>`;
             return;
           }
 
@@ -869,7 +908,7 @@
             document.getElementById('btn-next').disabled = !data.hasNextPage;
           }
         } catch (err) {
-          tbody.innerHTML = `<tr><td colspan="5"><p class="msg-err" style="margin: 1rem;">Error de conexión: ${err.message}</p></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5"><p class="msg-err" style="margin: 1rem;"><span>Error de conexión: ${err.message}</span></p></td></tr>`;
         } finally {
           // Ocultar Overlay Loader con delay controlado (mínimo 1200ms)
           if (esCargaInicial) {
