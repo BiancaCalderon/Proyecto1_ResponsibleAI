@@ -9,33 +9,93 @@
       input, button { padding: 0.6rem; margin-right: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
       button { background-color: #0066cc; color: white; border: none; cursor: pointer; }
       button:hover { background-color: #004c99; }
+      button:disabled { background-color: #999; cursor: not-allowed; }
       table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
       th, td { border: 1px solid #ccc; padding: 0.6rem; text-align: left; }
       th { background-color: #f4f4f4; }
       .error-msg { color: #d9534f; font-weight: bold; }
+      .success-msg { color: #2e7d32; font-weight: bold; }
+      section { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid #eee; }
+      h2 { font-size: 1.1rem; color: #333; }
+      #estado-recoleccion { margin-top: 0.8rem; }
     </style>
   </head>
   <body>
     <h1>Directorio de Médicos Especialistas</h1>
-    <div>
-      <input id="especialidad" placeholder="Especialidad (ej. Cardiología)" onkeydown="if(event.key==='Enter') cargarDirectorio()" />
-      <input id="zona" placeholder="Zona (ej. Zona 10)" onkeydown="if(event.key==='Enter') cargarDirectorio()" />
-      <button onclick="cargarDirectorio()">Buscar</button>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>Especialidad</th>
-          <th>Zona</th>
-          <th>Teléfono</th>
-          <th>Sitio web</th>
-        </tr>
-      </thead>
-      <tbody id="resultados"></tbody>
-    </table>
+
+    <section>
+      <h2>Recolectar nuevos datos</h2>
+      <div>
+        <input id="rec-keyword" placeholder="Keyword (ej. cardiologo)" />
+        <input id="rec-zona" placeholder="Zona (ej. zona10)" />
+        <input id="rec-especialidad" placeholder="Especialidad (ej. Cardiología)" />
+        <button id="btn-recolectar" onclick="recolectarDatos()">Buscar y guardar</button>
+      </div>
+      <div id="estado-recoleccion"></div>
+    </section>
+
+    <section>
+      <h2>Consultar directorio</h2>
+      <div>
+        <input id="especialidad" placeholder="Especialidad (ej. Cardiología)" onkeydown="if(event.key==='Enter') cargarDirectorio()" />
+        <input id="zona" placeholder="Zona (ej. Zona 10)" onkeydown="if(event.key==='Enter') cargarDirectorio()" />
+        <button onclick="cargarDirectorio()">Buscar</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Especialidad</th>
+            <th>Zona</th>
+            <th>Teléfono</th>
+            <th>Sitio web</th>
+          </tr>
+        </thead>
+        <tbody id="resultados"></tbody>
+      </table>
+    </section>
 
     <script>
+      async function recolectarDatos() {
+        const keyword = document.getElementById('rec-keyword').value.trim();
+        const zona = document.getElementById('rec-zona').value.trim();
+        const especialidad = document.getElementById('rec-especialidad').value.trim();
+        const estadoDiv = document.getElementById('estado-recoleccion');
+        const boton = document.getElementById('btn-recolectar');
+
+        if (!keyword || !zona || !especialidad) {
+          estadoDiv.innerHTML = '<p class="error-msg">Completa keyword, zona y especialidad antes de buscar.</p>';
+          return;
+        }
+
+        boton.disabled = true;
+        estadoDiv.innerHTML = '<p>Consultando Google Places y guardando resultados...</p>';
+
+        const params = new URLSearchParams({ keyword, zona, especialidad });
+
+        try {
+          const response = await fetch(`/recolectar?${params.toString()}`);
+          const data = await response.json();
+
+          if (!response.ok) {
+            const errorText = data.error || data.detalle || `Error HTTP ${response.status}`;
+            estadoDiv.innerHTML = `<p class="error-msg">Error: ${errorText}</p>`;
+            return;
+          }
+
+          estadoDiv.innerHTML = `<p class="success-msg">${data.resultados_guardados} resultados guardados para "${data.query_usada}".</p>`;
+
+          // Refresca automáticamente la tabla de consulta con la especialidad recién recolectada
+          document.getElementById('especialidad').value = especialidad;
+          document.getElementById('zona').value = zona;
+          cargarDirectorio();
+        } catch (err) {
+          estadoDiv.innerHTML = `<p class="error-msg">Error de conexión al recolectar datos. (${err.message})</p>`;
+        } finally {
+          boton.disabled = false;
+        }
+      }
+
       async function cargarDirectorio() {
         const especialidad = document.getElementById('especialidad').value.trim();
         const zona = document.getElementById('zona').value.trim();
