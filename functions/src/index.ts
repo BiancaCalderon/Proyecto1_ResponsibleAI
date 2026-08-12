@@ -106,7 +106,7 @@ export const recolectarDirectorio = onRequest(async (request, response) => {
     }
 
     const query = `${keyword} ${zona} Guatemala`;
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`;
+    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&type=doctor&key=${apiKey}`;
 
     try {
       const apiResponse = await fetch(url);
@@ -126,8 +126,19 @@ export const recolectarDirectorio = onRequest(async (request, response) => {
 
       const batch = db.batch();
       let guardados = 0;
+      let yaExistian = 0;
 
       for (const lugar of resultados) {
+        const docRef = db.collection("directorio").doc(lugar.place_id);
+        const docExistente = await docRef.get();
+
+        if (docExistente.exists) {
+          // Ya existe (probablemente de otra búsqueda de zona/keyword distinta).
+          // No lo sobreescribimos para no perder su zona/especialidad original.
+          yaExistian++;
+          continue;
+        }
+
         let telefono = lugar.formatted_phone_number || "";
         let sitioWeb = lugar.website || "";
 
@@ -147,7 +158,6 @@ export const recolectarDirectorio = onRequest(async (request, response) => {
           }
         }
 
-        const docRef = db.collection("directorio").doc(lugar.place_id);
         batch.set(docRef, {
           nombre: lugar.name,
           especialidad: especialidad,
@@ -164,11 +174,12 @@ export const recolectarDirectorio = onRequest(async (request, response) => {
 
       await batch.commit();
 
-      logger.info(`Guardados ${guardados} resultados para query: ${query}`);
+      logger.info(`Guardados ${guardados} resultados nuevos (${yaExistian} ya existían) para query: ${query}`);
       response.status(200).send({
         mensaje: "Recolección completada.",
         query_usada: query,
         resultados_guardados: guardados,
+        resultados_ya_existentes: yaExistian,
       });
     } catch (error) {
       logger.error("Error inesperado", {error});
