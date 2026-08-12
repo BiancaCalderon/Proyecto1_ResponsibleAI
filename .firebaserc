@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "proyecto1-resai"
+    "default": "proyecto1-resai",
+    "monica": "p1-resposibleai"
   }
 }

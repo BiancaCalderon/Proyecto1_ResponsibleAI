@@ -49,14 +49,14 @@ function aplicarIpWhitelist(
     return;
   }
 
-  response.status(403).send({error: `IP no autorizada (${clientIp}).`});
+  response.status(403).send({error: "IP no autorizada. Acceso denegado."});
 }
 
 function normalizeString(str: string): string {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-export const helloWorld = onRequest((request, response) => {
+export const helloWorld = onRequest({secrets: ["ALLOWED_IPS"]}, (request, response) => {
   aplicarIpWhitelist(request, response, () => {
     logger.info("Hello logs!", {structuredData: true});
     response.send("Hello from Firebase!");
@@ -85,110 +85,113 @@ interface PlaceDetailsResponse {
   status: string;
 }
 
-export const recolectarDirectorio = onRequest(async (request, response) => {
-  aplicarIpWhitelist(request, response, async () => {
-    const keyword = request.query.keyword as string;
-    const zona = request.query.zona as string;
-    const especialidad = request.query.especialidad as string;
+export const recolectarDirectorio = onRequest(
+  {secrets: ["PLACES_API_KEY", "ALLOWED_IPS"]},
+  async (request, response) => {
+    aplicarIpWhitelist(request, response, async () => {
+      const keyword = request.query.keyword as string;
+      const zona = request.query.zona as string;
+      const especialidad = request.query.especialidad as string;
 
-    if (!keyword || !zona || !especialidad) {
-      response.status(400).send({
-        error: "Faltan parámetros. Se requiere: keyword, zona, especialidad.",
-      });
-      return;
-    }
-
-    const apiKey = process.env.PLACES_API_KEY;
-    if (!apiKey) {
-      logger.error("PLACES_API_KEY no está configurada.");
-      response.status(500).send({error: "Configuración de API key faltante."});
-      return;
-    }
-
-    const query = `${keyword} ${zona} Guatemala`;
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&type=doctor&key=${apiKey}`;
-
-    try {
-      const apiResponse = await fetch(url);
-      const data = (await apiResponse.json()) as PlacesApiResponse;
-
-      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-        logger.error("Error de Places API", {status: data.status, message: data.error_message});
-        response.status(502).send({
-          error: "Error consultando Places API.",
-          detalle: data.error_message || data.status,
+      if (!keyword || !zona || !especialidad) {
+        response.status(400).send({
+          error: "Faltan parámetros. Se requiere: keyword, zona, especialidad.",
         });
         return;
       }
 
-      const resultados = data.results.slice(0, 20);
-      const fechaRecoleccion = new Date().toISOString();
-
-      const batch = db.batch();
-      let guardados = 0;
-      let yaExistian = 0;
-
-      for (const lugar of resultados) {
-        const docRef = db.collection("directorio").doc(lugar.place_id);
-        const docExistente = await docRef.get();
-
-        if (docExistente.exists) {
-          // Ya existe (probablemente de otra búsqueda de zona/keyword distinta).
-          // No lo sobreescribimos para no perder su zona/especialidad original.
-          yaExistian++;
-          continue;
-        }
-
-        let telefono = lugar.formatted_phone_number || "";
-        let sitioWeb = lugar.website || "";
-
-        // Si textsearch no trajo teléfono o sitio web, intentamos con Place Details
-        if (!telefono || !sitioWeb) {
-          try {
-            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${lugar.place_id}&fields=formatted_phone_number,website&key=${apiKey}`;
-            const detailsResponse = await fetch(detailsUrl);
-            const detailsData = (await detailsResponse.json()) as PlaceDetailsResponse;
-
-            if (detailsData.status === "OK" && detailsData.result) {
-              telefono = telefono || detailsData.result.formatted_phone_number || "";
-              sitioWeb = sitioWeb || detailsData.result.website || "";
-            }
-          } catch (detailsError) {
-            logger.warn(`No se pudo obtener detalles para ${lugar.place_id}`, {detailsError});
-          }
-        }
-
-        batch.set(docRef, {
-          nombre: lugar.name,
-          especialidad: especialidad,
-          direccion: lugar.formatted_address || "",
-          telefono: telefono,
-          sitio_web: sitioWeb,
-          zona: zona,
-          place_id: lugar.place_id,
-          fecha_recoleccion: fechaRecoleccion,
-          keyword_usado: query,
-        });
-        guardados++;
+      const apiKey = process.env.PLACES_API_KEY;
+      if (!apiKey) {
+        logger.error("PLACES_API_KEY no está configurada.");
+        response.status(500).send({error: "Configuración de API key faltante."});
+        return;
       }
 
-      await batch.commit();
+      const query = `${keyword} ${zona} Guatemala`;
+      const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&type=doctor&key=${apiKey}`;
 
-      logger.info(`Guardados ${guardados} resultados nuevos (${yaExistian} ya existían) para query: ${query}`);
-      response.status(200).send({
-        mensaje: "Recolección completada.",
-        query_usada: query,
-        resultados_guardados: guardados,
-        resultados_ya_existentes: yaExistian,
-      });
-    } catch (error) {
-      logger.error("Error inesperado", {error});
-      response.status(500).send({error: "Error interno al procesar la solicitud."});
-    }
-  });
-});
+      try {
+        const apiResponse = await fetch(url);
+        const data = (await apiResponse.json()) as PlacesApiResponse;
 
-export const directorioApi = onRequest(async (request, response) => {
+        if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+          logger.error("Error de Places API", {status: data.status, message: data.error_message});
+          response.status(502).send({
+            error: "Error consultando Places API.",
+            detalle: data.error_message || data.status,
+          });
+          return;
+        }
+
+        const resultados = data.results.slice(0, 20);
+        const fechaRecoleccion = new Date().toISOString();
+
+        const batch = db.batch();
+        let guardados = 0;
+        let yaExistian = 0;
+
+        for (const lugar of resultados) {
+          const docRef = db.collection("directorio").doc(lugar.place_id);
+          const docExistente = await docRef.get();
+
+          if (docExistente.exists) {
+            // Ya existe (probablemente de otra búsqueda de zona/keyword distinta).
+            // No lo sobreescribimos para no perder su zona/especialidad original.
+            yaExistian++;
+            continue;
+          }
+
+          let telefono = lugar.formatted_phone_number || "";
+          let sitioWeb = lugar.website || "";
+
+          // Si textsearch no trajo teléfono o sitio web, intentamos con Place Details
+          if (!telefono || !sitioWeb) {
+            try {
+              const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${lugar.place_id}&fields=formatted_phone_number,website&key=${apiKey}`;
+              const detailsResponse = await fetch(detailsUrl);
+              const detailsData = (await detailsResponse.json()) as PlaceDetailsResponse;
+
+              if (detailsData.status === "OK" && detailsData.result) {
+                telefono = telefono || detailsData.result.formatted_phone_number || "";
+                sitioWeb = sitioWeb || detailsData.result.website || "";
+              }
+            } catch (detailsError) {
+              logger.warn(`No se pudo obtener detalles para ${lugar.place_id}`, {detailsError});
+            }
+          }
+
+          batch.set(docRef, {
+            nombre: lugar.name,
+            especialidad: especialidad,
+            direccion: lugar.formatted_address || "",
+            telefono: telefono,
+            sitio_web: sitioWeb,
+            zona: zona,
+            place_id: lugar.place_id,
+            fecha_recoleccion: fechaRecoleccion,
+            keyword_usado: query,
+          });
+          guardados++;
+        }
+
+        await batch.commit();
+
+        logger.info(`Guardados ${guardados} resultados nuevos (${yaExistian} ya existían) para query: ${query}`);
+        response.status(200).send({
+          mensaje: "Recolección completada.",
+          query_usada: query,
+          resultados_guardados: guardados,
+          resultados_ya_existentes: yaExistian,
+        });
+      } catch (error) {
+        logger.error("Error inesperado", {error});
+        response.status(500).send({error: "Error interno al procesar la solicitud."});
+      }
+    });
+  },
+);
+
+export const directorioApi = onRequest({secrets: ["ALLOWED_IPS"]}, async (request, response) => {
   aplicarIpWhitelist(request, response, async () => {
     if (request.method !== "GET") {
       response.status(405).send({error: "Método no permitido. Solo se admite GET."});
@@ -267,7 +270,7 @@ export const directorioApi = onRequest(async (request, response) => {
   });
 });
 
-export const sembrarDirectorio = onRequest(async (request, response) => {
+export const sembrarDirectorio = onRequest({secrets: ["ALLOWED_IPS"]}, async (request, response) => {
   aplicarIpWhitelist(request, response, async () => {
     const fecha = new Date().toISOString();
     const datosSemilla = [
