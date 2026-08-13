@@ -49,11 +49,19 @@ function aplicarIpWhitelist(
     return;
   }
 
-  response.status(403).send({error: "IP no autorizada. Acceso denegado."});
+  response.status(403).send({error: `IP no autorizada (${clientIp}).`});
 }
 
 function normalizeString(str: string): string {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+function esZonaValida(zona: string): boolean {
+  const normalizada = normalizeString(zona);
+  const match = normalizada.match(/^zona\s*(\d{1,2})$/);
+  if (!match) return false;
+  const numero = parseInt(match[1], 10);
+  return numero >= 1 && numero <= 25;
 }
 
 export const helloWorld = onRequest({secrets: ["ALLOWED_IPS"]}, (request, response) => {
@@ -96,6 +104,13 @@ export const recolectarDirectorio = onRequest(
       if (!keyword || !zona || !especialidad) {
         response.status(400).send({
           error: "Faltan parámetros. Se requiere: keyword, zona, especialidad.",
+        });
+        return;
+      }
+
+      if (!esZonaValida(zona)) {
+        response.status(400).send({
+          error: "Zona inválida. Debe tener el formato 'zona' seguido de un número del 1 al 25, por ejemplo 'zona 10'.",
         });
         return;
       }
