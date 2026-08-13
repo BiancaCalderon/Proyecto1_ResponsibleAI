@@ -46,7 +46,7 @@ En tu terminal de Linux/WSL, exporta tu API key de Google Places y la lista de I
 
 ```bash
 export PLACES_API_KEY="TU_API_KEY_DE_PLACES"
-export ALLOWED_IPS="127.0.0.1,::ffff:127.0.0.1,129.222.59.177,190.56.194.12"
+export ALLOWED_IPS="[IP_ADDRESS]"
 ```
 
 ---
